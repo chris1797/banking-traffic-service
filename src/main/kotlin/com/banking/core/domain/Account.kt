@@ -1,12 +1,14 @@
 package com.banking.core.domain
 
 import jakarta.persistence.*
+import java.math.BigDecimal
 
 @Entity
 @Table(name = "account")
 open class Account(
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "id", nullable = false)
-    var id: Long? = null
+
+    val accountNumber: String,
+    val holderName: String,
+    val balance: BigDecimal,
+
 ) : BaseEntity()

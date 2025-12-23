@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: BankingTrafficService
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false # http 요청 전체에 대한 트랜잭션 관리를 비활성화, DB 커넥션 필요 이상 점유를 방지
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/dev?currentSchema=banking-traffic
+    username:
+    password:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000 # 30 seconds
+      max-lifetime: 60000 # 60 seconds
+      connection-timeout: 30000 # 30 seconds
