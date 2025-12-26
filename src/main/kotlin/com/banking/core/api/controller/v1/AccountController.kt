@@ -1,9 +1,10 @@
 package com.banking.core.api.controller.v1
 
+import com.banking.core.dto.request.AccountCreateRequest
 import com.banking.core.service.AccountService
 import com.banking.core.support.response.ApiResponse
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
@@ -12,7 +13,11 @@ class AccountController(
 ) {
 
     @PostMapping("/v1/account")
-    fun createAccount(): ApiResponse<Any> {
-        return ApiResponse.success(accountService.createAccount())
+    fun createAccount(
+        @RequestBody request: AccountCreateRequest
+    ): ApiResponse<Any> {
+        return ApiResponse.success(
+            accountService.createAccount(request)
+        )
     }
 }

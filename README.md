@@ -76,6 +76,12 @@
 
 [//]: # (| **Idempotency Key** | 중복 요청 방지 &#40;결제&#41; |)
 
+## 상세 문서
+
+| 도메인 | 문서 | 설명 |
+|--------|------|------|
+| Account | [동시성 이슈](docs/account/CONCURRENCY.md) | 계좌 관련 동시성 문제 |
+
 ## 부하 테스트
 
 - 도구: K6? Gatling? JMeter? nGrinder?

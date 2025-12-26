@@ -5,8 +5,9 @@ import java.math.BigDecimal
 
 @Entity
 @Table(name = "account")
-open class Account(
+class Account(
 
+    @Column(unique = true, nullable = false)
     val accountNumber: String,
     val holderName: String,
     val balance: BigDecimal,
