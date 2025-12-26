@@ -13,7 +13,6 @@ class AccountController(
 
     @PostMapping("/v1/account")
     fun createAccount(): ApiResponse<Any> {
-//        accountService.createAccount()
-        return ApiResponse.success()
+        return ApiResponse.success(accountService.createAccount())
     }
 }
