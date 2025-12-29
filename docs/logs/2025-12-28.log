@@ -1,0 +1,183 @@
+# 작업 로그 - 2025-12-28
+
+## 작업 요약
+
+계좌 생성(`createAccount`) 기능의 동시성 문제 분석 및 리팩토링
+
+---
+
+## 1. Race Condition (Check-then-Act 패턴)
+
+### 기존 코드
+```kotlin
+if (!accountRepository.existsByAccountNumber(accountNumber)) {
+    return accountRepository.save(account)
+}
+```
+
+### 문제점
+- `existsByAccountNumber()` 체크와 `save()` 사이에 Race Condition 발생 가능
+- 다른 트랜잭션이 같은 계좌번호로 저장할 수 있음
+
+### 해결
+- `existsByAccountNumber()` 체크 제거
+- DB unique 제약조건 + `DataIntegrityViolationException` catch 후 재시도
+
+---
+
+## 2. 재시도 로직 버그
+
+### 기존 코드
+```kotlin
+repeat(MAX_RETRY_COUNT) {
+    // ...
+    throw CoreException(...)  // repeat 안에 있어서 첫 시도에서 바로 실패
+}
+```
+
+### 문제점
+- `throw`가 `repeat` 블록 안에 있어서 catch 후 바로 예외 발생
+- 재시도가 실제로 동작하지 않음
+
+### 해결
+- `throw`를 `repeat` 블록 밖으로 이동
+
+---
+
+## 3. @Transactional Self-Invocation 문제
+
+### 시도했던 코드
+```kotlin
+fun createAccount(...) {
+    return saveAccount(account)  // 내부 호출
+}
+
+@Transactional
+fun saveAccount(...) {  // 트랜잭션 적용 안 됨!
+}
+```
+
+### 문제점
+- Spring @Transactional은 프록시 기반
+- 같은 클래스 내 메서드 호출(self-invocation)은 프록시를 거치지 않음
+
+### 해결
+- `TransactionTemplate` 사용하여 프로그래매틱 트랜잭션 제어
+- 각 재시도마다 독립적인 트랜잭션 보장
+
+---
+
+## 4. 테스트 용이성 부족
+
+### 기존 코드
+```kotlin
+private fun generateAccountNumber(): String {
+    return UUID.randomUUID().toString().replace("-", "").substring(0, 12)
+}
+```
+
+### 문제점
+- private 메서드 + 비결정적(랜덤) 반환값
+- 테스트에서 mock 불가
+
+### 해결
+- `AccountNumberGenerator` 인터페이스 분리
+- `UuidAccountNumberGenerator` 구현체 생성
+- 생성자 주입으로 테스트에서 mock 가능
+
+---
+
+## 5. 로깅 및 원인 추적 부재
+
+### 기존 코드
+```kotlin
+catch (e: DataIntegrityViolationException) {
+    // 아무것도 안 함
+}
+throw CoreException(ErrorType.CREATE_ACCOUNT_FAILED)  // 원인 정보 손실
+```
+
+### 문제점
+- 재시도 발생 여부 로그 없음
+- 원본 예외 정보 손실
+
+### 해결
+- warn 레벨 로그 추가 (재시도 횟수 포함)
+- `initCause(lastException)`로 원본 예외 보존
+
+---
+
+## 6. 단위 테스트 추가
+
+### 작업 내용
+- MockK 의존성 추가 (`build.gradle.kts`)
+- `AccountServiceTest` 작성
+
+### 테스트 케이스
+1. 계좌 생성 성공
+2. 계좌번호 중복 발생 시 재시도하여 성공
+3. 최대 재시도 횟수 초과 시 예외 발생
+
+---
+
+## 변경된 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `AccountService.kt` | TransactionTemplate 적용, 로깅 추가 |
+| `AccountNumberGenerator.kt` | 인터페이스 신규 생성 |
+| `UuidAccountNumberGenerator.kt` | 구현체 신규 생성 |
+| `AccountServiceTest.kt` | 단위 테스트 추가 |
+| `build.gradle.kts` | MockK 의존성 추가 |
+| `docs/account/CONCURRENCY.md` | 문서 업데이트 |
+| `docs/account/create-account/REFACTORING.md` | 리팩토링 기록 추가 |
+
+---
+
+## 최종 코드
+
+```kotlin
+@Service
+class AccountService(
+    private val accountRepository: AccountRepository,
+    private val accountNumberGenerator: AccountNumberGenerator,
+    private val transactionTemplate: TransactionTemplate
+) {
+    private val log = LoggerFactory.getLogger(AccountService::class.java)
+
+    companion object {
+        private const val MAX_RETRY_COUNT = 3
+    }
+
+    fun createAccount(request: AccountCreateRequest): Account {
+        var lastException: DataIntegrityViolationException? = null
+
+        repeat(MAX_RETRY_COUNT) { attempt ->
+            try {
+                return transactionTemplate.execute {
+                    val accountNumber = accountNumberGenerator.generate()
+                    val account = Account(
+                        accountNumber = accountNumber,
+                        holderName = request.holderName,
+                        balance = request.initialBalance,
+                    )
+                    accountRepository.save(account)
+                }!!
+            } catch (e: DataIntegrityViolationException) {
+                lastException = e
+                log.warn("계좌번호 충돌 발생, 재시도 중 (시도: ${attempt + 1}/$MAX_RETRY_COUNT)")
+            }
+        }
+        throw CoreException(ErrorType.CREATE_ACCOUNT_FAILED).initCause(lastException)
+    }
+}
+```
+
+---
+
+## 교훈
+
+1. **Check-then-Act 패턴 지양**: DB 제약조건을 신뢰하고 예외 처리로 대응
+2. **@Transactional 프록시 이해**: self-invocation 시 트랜잭션 미적용 주의
+3. **테스트 가능한 설계**: 외부 의존성(랜덤, 시간 등)은 인터페이스로 분리
+4. **로깅과 원인 추적**: 운영 환경 디버깅을 위한 충분한 정보 기록
