@@ -2,12 +2,13 @@
 
 ## 1. 프로젝트 기본 설정
 
-- [ ] PostgreSQL 연결 설정 (application.yml)
-- [ ] Docker Compose 설정 (PostgreSQL, Redis)
+- [x] PostgreSQL 연결 설정 (application.yml) - 로컬 DB 사용
+- [x] Docker Compose 설정 (Redis, K6, InfluxDB, Grafana)
 - [x] 공통 응답 포맷 정의 (ApiResponse)
 - [x] 전역 예외 핸들러 구현 (ControllerAdvice)
 - [x] Base Entity 생성 (id, createdAt, updatedAt)
 - [x] 커스텀 예외 정의 (CoreException, ErrorType)
+- [x] Makefile (명령어 간소화)
 
 ## 2. 계좌 (Account)
 
@@ -19,7 +20,9 @@
   - [ ] 입금
   - [ ] 출금
 - [x] AccountController
+- [x] AccountNumberGenerator (인터페이스 분리)
 - [ ] 단위 테스트
+  - [x] AccountServiceTest (계좌 생성)
 
 ## 3. 이체 (Transfer)
 
@@ -62,6 +65,13 @@
 
 ## 8. 부하 테스트
 
-- [ ] 테스트 도구 선정
+- [x] 테스트 도구 선정 (K6)
+- [x] 인프라 구성 (InfluxDB, Grafana)
+- [x] ARM64(Apple Silicon) 호환성 설정
+- [x] K6 사용 가이드 문서 (k6/README.md)
+- [x] Grafana 데이터소스 프로비저닝 설정
 - [ ] 시나리오 작성
+  - [x] 계좌 생성 (account-create.js)
+  - [ ] 입금/출금
+  - [ ] 이체
 - [ ] 테스트 실행 및 결과 분석
