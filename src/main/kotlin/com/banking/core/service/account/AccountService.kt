@@ -24,7 +24,6 @@ class AccountService(
     }
 
     fun createAccount(request: AccountCreateRequest): Account {
-
         var lastException: DataIntegrityViolationException? = null
 
         repeat(MAX_RETRY_COUNT) { attempt ->

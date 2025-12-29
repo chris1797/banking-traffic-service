@@ -35,8 +35,9 @@ class AccountServiceTest {
         )
     }
 
+
     @Test
-    fun `계좌 생성 성공`() {
+    fun `계좌생성 전체 로직 성공 테스트`() {
         // given
         val request = AccountCreateRequest(
             holderName = "이재훈",
@@ -44,17 +45,26 @@ class AccountServiceTest {
         )
         val expectedAccountNumber = "1234-5678-9012"
 
+        // 생성된 계좌번호가 예상한 값과 일치하도록
         every { accountNumberGenerator.generate() } returns expectedAccountNumber
-        every { transactionTemplate.execute(any<TransactionCallback<Account>>())
-        } answers {
+
+        // 트랜잭션 템플릿이 정상적으로 동작하도록 설정
+        every { transactionTemplate.execute(any<TransactionCallback<Account>>()) } answers {
             firstArg<TransactionCallback<Account>>().doInTransaction(mockk())
         }
+
+        // 저장소가 계좌를 정상적으로 저장하도록 설정
         every { accountRepository.save(any()) } answers { firstArg() }
 
         // when
         val result = accountService.createAccount(request)
 
-        // then
+        /*
+        then
+        1. 생성된 계좌의 속성이 예상한 값과 일치하는지 검증
+        2. 계좌번호 생성기와 저장소가 각각 한 번씩 호출되었는지 검증
+        3. 트랜잭션 템플릿이 한 번 호출되었는지 검증
+         */
         assertThat(result.accountNumber).isEqualTo(expectedAccountNumber)
         assertThat(result.holderName).isEqualTo("이재훈")
         assertThat(result.balance).isEqualByComparingTo(BigDecimal(1000))
@@ -71,6 +81,7 @@ class AccountServiceTest {
             initialBalance = BigDecimal(1000)
         )
 
+        // 첫 번째 호출에서는 중복된 계좌번호 반환, 두 번째 호출에서는 고유한 계좌번호 반환
         every { accountNumberGenerator.generate() } returnsMany listOf(
             "duplicate00001",
             "unique12345678"
