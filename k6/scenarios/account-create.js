@@ -41,13 +41,22 @@ export default function () {
 
     const response = http.post(`${BASE_URL}/v1/account`, payload, params);
 
-    check(response, {
+    const checkResult = check(response, {
         'status is 200': (r) => r.status === 200,
         'response has accountNumber': (r) => {
-            const body = JSON.parse(r.body);
-            return body.data && body.data.accountNumber;
+            try {
+                const body = JSON.parse(r.body);
+                return body.data && body.data.accountNumber;
+            } catch (e) {
+                return false;
+            }
         },
     });
+
+    // 실패 시 로그 출력
+    if (!checkResult) {
+        console.error(`[FAIL] status=${response.status}, body=${response.body}`);
+    }
 
     sleep(0.1);  // 100ms 대기
 }
@@ -56,7 +65,7 @@ export default function () {
 export function handleSummary(data) {
     return {
         'stdout': textSummary(data, { indent: ' ', enableColors: true }),
-        './k6/results/account-create-summary.json': JSON.stringify(data),
+        '/scripts/results/account-create-summary.json': JSON.stringify(data),
     };
 }
 
