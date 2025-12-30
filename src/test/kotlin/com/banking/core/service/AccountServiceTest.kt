@@ -1,7 +1,7 @@
 package com.banking.core.service
 
 import com.banking.core.domain.Account
-import com.banking.core.dto.request.AccountCreateRequest
+import com.banking.core.dto.request.account.AccountCreateRequest
 import com.banking.core.repository.AccountRepository
 import com.banking.core.service.account.AccountService
 import com.banking.core.service.account.AccountNumberGenerator

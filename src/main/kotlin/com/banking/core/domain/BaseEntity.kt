@@ -21,7 +21,8 @@ abstract class BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(columnDefinition = "VARCHAR")
-    private var status: EntityStatus = EntityStatus.ACTIVE
+    var status: EntityStatus = EntityStatus.ACTIVE
+        protected set
 
     @CreationTimestamp
     val createdAt: LocalDateTime = LocalDateTime.MIN
@@ -43,7 +44,7 @@ abstract class BaseEntity {
     }
 
     fun isDeleted(): Boolean {
-        return status == EntityStatus.ACTIVE
+        return status == EntityStatus.DELETED
     }
 
 

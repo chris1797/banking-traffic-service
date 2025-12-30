@@ -1,13 +1,16 @@
 package com.banking.core.service.account
 
 import com.banking.core.domain.Account
-import com.banking.core.dto.request.AccountCreateRequest
+import com.banking.core.domain.EntityStatus
+import com.banking.core.dto.request.account.AccountCreateRequest
+import com.banking.core.dto.response.account.AccountResponse
 import com.banking.core.repository.AccountRepository
 import com.banking.core.support.response.error.CoreException
 import com.banking.core.support.response.error.ErrorType
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 
 @Service
@@ -43,5 +46,17 @@ class AccountService(
             }
         }
         throw CoreException(ErrorType.CREATE_ACCOUNT_FAILED).initCause(lastException)
+    }
+
+    @Transactional(readOnly = true)
+    fun getAccount(accountNumber: String): AccountResponse {
+        val account = accountRepository.findByAccountNumber(accountNumber)
+            ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
+
+        if (account.isDeleted()) {
+            throw CoreException(ErrorType.ACCOUNT_DELETED)
+        }
+
+        return AccountResponse.from(account)
     }
 }
