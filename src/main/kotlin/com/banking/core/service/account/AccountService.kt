@@ -12,6 +12,7 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import java.math.BigDecimal
 
 @Service
 class AccountService(
@@ -27,18 +28,22 @@ class AccountService(
     }
 
     fun createAccount(request: AccountCreateRequest): Account {
+        require(request.holderName.isNotBlank()) {
+            "계좌주 이름은 비어 있을 수 없습니다."
+        }
+
         var lastException: DataIntegrityViolationException? = null
 
         repeat(MAX_RETRY_COUNT) { attempt ->
             try {
                 return transactionTemplate.execute {
                     val accountNumber = accountNumberGenerator.generate()
-                    val account = Account.create(
+                    val accountEntity = Account.create(
                         accountNumber = accountNumber,
                         holderName = request.holderName,
                         balance = request.initialBalance,
                     )
-                    accountRepository.save(account)
+                    accountRepository.save(accountEntity)
                 }!!
             } catch (e: DataIntegrityViolationException) {
                 lastException = e
@@ -50,13 +55,27 @@ class AccountService(
 
     @Transactional(readOnly = true)
     fun getAccount(accountNumber: String): AccountResponse {
-        val account = accountRepository.findByAccountNumber(accountNumber)
+        val accountEntity = accountRepository.findByAccountNumber(accountNumber)
             ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
 
-        if (account.isDeleted()) {
+        if (accountEntity.isDeleted()) {
             throw CoreException(ErrorType.ACCOUNT_DELETED)
         }
 
-        return AccountResponse.from(account)
+        return AccountResponse.from(accountEntity)
+    }
+
+    @Transactional(rollbackFor = [Exception::class])
+    fun deposit(accountNumber: String, amount: BigDecimal): AccountResponse {
+        require(amount > BigDecimal.ZERO) { "입금 금액은 0보다 커야 합니다." }
+        val accountEntity = accountRepository.findByAccountNumber(accountNumber)
+            ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
+
+        if (!accountEntity.isActive()) {
+            throw CoreException(ErrorType.ACCOUNT_DELETED)
+        }
+
+        accountEntity.deposit(amount)
+        return AccountResponse.from(accountEntity)
     }
 }

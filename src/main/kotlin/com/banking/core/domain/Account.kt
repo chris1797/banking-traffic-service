@@ -1,5 +1,7 @@
 package com.banking.core.domain
 
+import com.banking.core.support.response.error.CoreException
+import com.banking.core.support.response.error.ErrorType
 import jakarta.persistence.*
 import java.math.BigDecimal
 
@@ -10,9 +12,13 @@ class Account(
     @Column(unique = true, nullable = false)
     val accountNumber: String,
     val holderName: String,
-    val balance: BigDecimal,
+    var balance: BigDecimal,
 
-) : BaseEntity() {
+    ) : BaseEntity() {
+
+    fun deposit(amount: BigDecimal) {
+        this.balance += amount
+    }
 
     companion object {
         fun create(
@@ -20,7 +26,6 @@ class Account(
             holderName: String,
             balance: BigDecimal
         ): Account {
-            require( holderName.isNotBlank() ) { "계좌주 이름은 비어 있을 수 없습니다." }
             return Account(
                 accountNumber =  accountNumber,
                 holderName = holderName,
