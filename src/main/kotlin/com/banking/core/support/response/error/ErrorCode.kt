@@ -11,4 +11,5 @@ enum class ErrorCode {
     ERROR_1002, // Account Not Found
     ERROR_1003, // Account Deleted
     ERROR_1004, // Invalid Deposit Amount
+    ERROR_1005, // Deposit Failed (Optimistic Lock Conflict)
 }

@@ -6,6 +6,7 @@ import com.banking.core.dto.response.account.AccountResponse
 import com.banking.core.service.account.AccountService
 import com.banking.core.support.response.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -37,12 +38,11 @@ class AccountController(
     /**
      * 입금
      */
-    @PostMapping("/v1/account/{accountNumber}/deposit")
+    @PatchMapping("/v1/account/{accountNumber}/deposit")
     fun deposit(
-        @PathVariable accountNumber: String,
         @RequestBody request: AccountDepositRequest
     ): ApiResponse<AccountResponse> {
-        return ApiResponse.success(accountService.deposit(accountNumber, request.amount))
+        return ApiResponse.success(accountService.deposit(request))
     }
 
 }

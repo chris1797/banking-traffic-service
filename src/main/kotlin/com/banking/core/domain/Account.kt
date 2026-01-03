@@ -14,6 +14,9 @@ class Account(
     val holderName: String,
     var balance: BigDecimal,
 
+    @Version
+    val version: Long = 0,
+
     ) : BaseEntity() {
 
     fun deposit(amount: BigDecimal) {

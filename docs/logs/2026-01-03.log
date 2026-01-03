@@ -1,0 +1,127 @@
+# 작업 로그 - 2026-01-03
+
+## 작업 요약
+
+입금(deposit) 로직 동시성 이슈 분석 및 문서화
+
+---
+
+## 1. 입금 로직 동시성 이슈 분석
+
+### 분석 대상 코드
+
+```kotlin
+// AccountService.kt
+@Transactional(rollbackFor = [Exception::class])
+fun deposit(accountNumber: String, amount: BigDecimal) {
+    require(amount > BigDecimal.ZERO) { "입금 금액은 0보다 커야 합니다." }
+    val accountEntity = accountRepository.findByAccountNumber(accountNumber)
+        ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
+
+    if (!accountEntity.isActive()) {
+        throw CoreException(ErrorType.ACCOUNT_DELETED)
+    }
+
+    accountEntity.deposit(amount)
+}
+
+// Account.kt
+fun deposit(amount: BigDecimal) {
+    this.balance += amount
+}
+```
+
+### 발견된 이슈
+
+1. **Lost Update (높음)**
+   - 일반 SELECT로 조회하여 동시 입금 시 한쪽 업데이트 유실
+   - 해결책: 낙관적 락 (`@Version`) 선택
+
+2. **Double Submit (중간)**
+   - 중복 요청 방지 메커니즘 없음
+   - 해결책: Idempotency Key 도입
+
+3. **도메인 검증 부재 (낮음)**
+   - `Account.deposit()`에서 금액 검증 없음
+   - 해결책: 도메인 메서드에 `require` 추가
+
+---
+
+## 2. 락 전략 선택: 낙관적 락
+
+### 판단 근거
+
+| 고려 사항 | 분석 |
+|-----------|------|
+| 계좌 유형 | 개인 계좌 (단일 소유자) |
+| 동시 접근 빈도 | 낮음 - 본인 또는 단일 소스에서 입금 |
+| 충돌 확률 | 낮음 |
+| 성능 요구사항 | DB 락 대기 없이 빠른 응답 필요 |
+
+### 결정
+
+- **낙관적 락 (`@Version`)** 선택
+- 개인 계좌 특성상 동시 입금 충돌 확률이 낮아 DB 락 대기 비용 불필요
+- 비관적 락은 법인/공동 계좌, 인기 판매자 계좌 등 충돌 빈도가 높은 경우에 적합
+
+---
+
+## 3. 낙관적 락 + 재시도 로직 구현
+
+### 구현 내용
+
+```kotlin
+// AccountService.kt
+fun deposit(request: AccountDepositRequest): AccountResponse {
+    require(request.amount > BigDecimal.ZERO) { "입금 금액은 0보다 커야 합니다." }
+
+    var lastException: ObjectOptimisticLockingFailureException? = null
+
+    repeat(MAX_RETRY_COUNT) { attempt ->
+        try {
+            return transactionTemplate.execute {
+                val accountEntity = accountRepository.findByAccountNumber(request.accountNumber)
+                    ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
+
+                if (!accountEntity.isActive()) {
+                    throw CoreException(ErrorType.ACCOUNT_DELETED)
+                }
+
+                accountEntity.deposit(request.amount)
+                AccountResponse.from(accountEntity)
+            }!!
+        } catch (e: ObjectOptimisticLockingFailureException) {
+            lastException = e
+            log.warn("입금 충돌 발생, 재시도 중 (계좌: ${request.accountNumber}, 시도: ${attempt + 1}/$MAX_RETRY_COUNT)")
+        }
+    }
+    throw CoreException(ErrorType.DEPOSIT_FAILED).initCause(lastException)
+}
+```
+
+### 주요 설계 결정
+
+- `TransactionTemplate` 사용: 재시도마다 새 트랜잭션 시작 (createAccount 패턴과 일관성)
+- `MAX_RETRY_COUNT = 3`: 기존 재시도 횟수 유지
+- `DEPOSIT_FAILED` 에러 추가: 409 Conflict 응답
+
+---
+
+## 변경된 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `docs/account/deposit/CONCURRENCY.md` | 입금 동시성 이슈 문서 생성, 해결 상태 업데이트 |
+| `README.md` | 상세 문서 섹션에 입금 동시성 이슈 링크 추가 |
+| `AccountService.kt` | deposit 메서드에 TransactionTemplate + 재시도 로직 추가 |
+| `ErrorType.kt` | DEPOSIT_FAILED 에러 타입 추가 |
+| `ErrorCode.kt` | ERROR_1005 추가 |
+
+---
+
+## 교훈
+
+1. 금융 도메인에서 잔액 변경은 반드시 락 전략을 고려해야 함
+2. 락 전략은 비즈니스 특성(계좌 유형, 충돌 빈도)에 따라 선택해야 함
+3. 도메인 객체는 자체적으로 불변식(invariant)을 검증해야 함
+4. 멱등성은 결제/입금 같은 금전 거래에서 필수적으로 고려해야 함
