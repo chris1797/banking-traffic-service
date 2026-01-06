@@ -68,8 +68,6 @@ class AccountService(
     }
 
     fun deposit(request: AccountDepositRequest): AccountResponse {
-        require(request.amount > BigDecimal.ZERO) { "입금 금액은 0보다 커야 합니다." }
-
         var lastException: ObjectOptimisticLockingFailureException? = null
 
         repeat(MAX_RETRY_COUNT) { attempt ->
@@ -78,7 +76,7 @@ class AccountService(
                     val accountEntity = accountRepository.findByAccountNumber(request.accountNumber)
                         ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
 
-                    if (!accountEntity.isActive()) {
+                    if (accountEntity.isDeleted()) {
                         throw CoreException(ErrorType.ACCOUNT_DELETED)
                     }
 

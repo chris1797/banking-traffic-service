@@ -19,7 +19,8 @@ class Account(
 
     ) : BaseEntity() {
 
-    fun deposit(amount: BigDecimal) {
+    internal fun deposit(amount: BigDecimal) {
+        require(amount > BigDecimal.ZERO) { "입금 금액은 0보다 커야 합니다." }
         this.balance += amount
     }
 

@@ -38,7 +38,7 @@ class AccountController(
     /**
      * 입금
      */
-    @PatchMapping("/v1/account/{accountNumber}/deposit")
+    @PatchMapping("/v1/account/deposit")
     fun deposit(
         @RequestBody request: AccountDepositRequest
     ): ApiResponse<AccountResponse> {
