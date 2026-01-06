@@ -3,6 +3,7 @@ package com.banking.core.service
 import com.banking.core.domain.Account
 import com.banking.core.dto.request.account.AccountCreateRequest
 import com.banking.core.dto.request.account.AccountDepositRequest
+import com.banking.core.dto.response.account.AccountResponse
 import com.banking.core.repository.AccountRepository
 import com.banking.core.service.account.AccountService
 import com.banking.core.service.account.AccountNumberGenerator
@@ -53,8 +54,8 @@ class AccountServiceTest {
         every { accountNumberGenerator.generate() } returns expectedAccountNumber
 
         // 트랜잭션 템플릿이 정상적으로 동작하도록 설정
-        every { transactionTemplate.execute(any<TransactionCallback<Account>>()) } answers {
-            firstArg<TransactionCallback<Account>>().doInTransaction(mockk())
+        every { transactionTemplate.execute(any<TransactionCallback<AccountResponse>>()) } answers {
+            firstArg<TransactionCallback<AccountResponse>>().doInTransaction(mockk())
         }
 
         // 저장소가 계좌를 정상적으로 저장하도록 설정
@@ -91,8 +92,8 @@ class AccountServiceTest {
             "unique12345678"
         )
 
-        every { transactionTemplate.execute(any<TransactionCallback<Account>>()) } answers {
-            firstArg<TransactionCallback<Account>>().doInTransaction(mockk())
+        every { transactionTemplate.execute(any<TransactionCallback<AccountResponse>>()) } answers {
+            firstArg<TransactionCallback<AccountResponse>>().doInTransaction(mockk())
         }
 
         var saveCallCount = 0

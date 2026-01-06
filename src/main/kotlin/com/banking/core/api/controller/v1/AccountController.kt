@@ -23,7 +23,7 @@ class AccountController(
     @PostMapping("/v1/account")
     fun createAccount(
         @RequestBody request: AccountCreateRequest
-    ): ApiResponse<Any> {
+    ): ApiResponse<AccountResponse> {
         return ApiResponse.success(accountService.createAccount(request))
     }
 

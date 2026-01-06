@@ -29,7 +29,7 @@ class AccountService(
         private const val MAX_RETRY_COUNT = 3
     }
 
-    fun createAccount(request: AccountCreateRequest): Account {
+    fun createAccount(request: AccountCreateRequest): AccountResponse {
         require(request.holderName.isNotBlank()) {
             "계좌주 이름은 비어 있을 수 없습니다."
         }
@@ -45,8 +45,8 @@ class AccountService(
                         holderName = request.holderName,
                         balance = request.initialBalance,
                     )
-                    accountRepository.save(accountEntity)
-                } ?: throw CoreException(ErrorType.CREATE_ACCOUNT_FAILED)
+                    AccountResponse.from(accountRepository.save(accountEntity))
+            } ?: throw CoreException(ErrorType.CREATE_ACCOUNT_FAILED)
             } catch (e: DataIntegrityViolationException) {
                 lastException = e
                 log.warn("계좌번호 충돌 발생, 재시도 중 (시도: ${attempt + 1}/$MAX_RETRY_COUNT)")
