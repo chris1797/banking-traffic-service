@@ -2,6 +2,7 @@ package com.banking.core.api.controller.v1
 
 import com.banking.core.dto.request.account.AccountCreateRequest
 import com.banking.core.dto.request.account.AccountDepositRequest
+import com.banking.core.dto.request.account.AccountWithdrawRequest
 import com.banking.core.dto.response.account.AccountResponse
 import com.banking.core.service.account.AccountService
 import com.banking.core.support.response.ApiResponse
@@ -43,6 +44,16 @@ class AccountController(
         @RequestBody request: AccountDepositRequest
     ): ApiResponse<AccountResponse> {
         return ApiResponse.success(accountService.deposit(request))
+    }
+
+    /**
+     * 출금
+     */
+    @PatchMapping("/v1/account/withdraw")
+    fun withdraw(
+        @RequestBody request: AccountWithdrawRequest
+    ): ApiResponse<AccountResponse> {
+        return ApiResponse.success(accountService.withdraw(request))
     }
 
 }
