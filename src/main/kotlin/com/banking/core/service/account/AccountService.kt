@@ -4,6 +4,7 @@ import com.banking.core.domain.Account
 import com.banking.core.domain.EntityStatus
 import com.banking.core.dto.request.account.AccountCreateRequest
 import com.banking.core.dto.request.account.AccountDepositRequest
+import com.banking.core.dto.request.account.AccountWithdrawRequest
 import com.banking.core.dto.response.account.AccountResponse
 import com.banking.core.repository.AccountRepository
 import com.banking.core.support.response.error.CoreException
@@ -89,5 +90,33 @@ class AccountService(
             }
         }
         throw CoreException(ErrorType.DEPOSIT_FAILED).initCause(lastException)
+    }
+
+    fun withdraw(request: AccountWithdrawRequest): AccountResponse {
+        var lastException: Exception? = null
+
+        repeat(MAX_RETRY_COUNT) { attempt ->
+            try {
+                return transactionTemplate.execute {
+                    val accountEntity = accountRepository.findByAccountNumber(request.accountNumber)
+                        ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
+
+                    if (accountEntity.isDeleted()) {
+                        throw CoreException(ErrorType.ACCOUNT_DELETED)
+                    }
+
+                    if (accountEntity.balance < request.amount) {
+                        throw CoreException(ErrorType.INSUFFICIENT_BALANCE)
+                    }
+
+                    accountEntity.withdraw(request.amount)
+                    AccountResponse.from(accountEntity)
+                } ?: throw CoreException(ErrorType.WITHDRAW_FAILED)
+            } catch (e: ObjectOptimisticLockingFailureException) {
+                lastException = e
+                log.warn("출금 충돌 발생, 재시도 중 (계좌: ${request.accountNumber}, 시도: ${attempt + 1}/$MAX_RETRY_COUNT)")
+            }
+        }
+        throw CoreException(ErrorType.WITHDRAW_FAILED).initCause(lastException)
     }
 }

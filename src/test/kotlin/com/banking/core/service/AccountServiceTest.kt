@@ -205,7 +205,7 @@ class AccountServiceTest {
             )
             val account = mockk<Account>(relaxed = true)
 
-            every { account.isActive() } returns false
+            every { account.isDeleted() } returns true
             every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
                 firstArg<TransactionCallback<*>>().doInTransaction(mockk())
             }
