@@ -27,7 +27,7 @@ class AccountService(
     private val log = LoggerFactory.getLogger(AccountService::class.java)
 
     companion object {
-        private const val MAX_RETRY_COUNT = 3
+        private const val MAX_RETRY_COUNT = 10
     }
 
     fun createAccount(request: AccountCreateRequest): AccountResponse {
