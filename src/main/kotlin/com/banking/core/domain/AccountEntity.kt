@@ -1,13 +1,11 @@
 package com.banking.core.domain
 
-import com.banking.core.support.response.error.CoreException
-import com.banking.core.support.response.error.ErrorType
 import jakarta.persistence.*
 import java.math.BigDecimal
 
 @Entity
 @Table(name = "account")
-class Account(
+class AccountEntity(
 
     @Column(unique = true, nullable = false)
     val accountNumber: String,
@@ -35,8 +33,8 @@ class Account(
             accountNumber: String,
             holderName: String,
             balance: BigDecimal
-        ): Account {
-            return Account(
+        ): AccountEntity {
+            return AccountEntity(
                 accountNumber =  accountNumber,
                 holderName = holderName,
                 balance = balance

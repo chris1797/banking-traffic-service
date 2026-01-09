@@ -1,7 +1,6 @@
 package com.banking.core.service.account
 
-import com.banking.core.domain.Account
-import com.banking.core.domain.EntityStatus
+import com.banking.core.domain.AccountEntity
 import com.banking.core.dto.request.account.AccountCreateRequest
 import com.banking.core.dto.request.account.AccountDepositRequest
 import com.banking.core.dto.request.account.AccountWithdrawRequest
@@ -15,7 +14,6 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
-import java.math.BigDecimal
 
 @Service
 class AccountService(
@@ -41,7 +39,7 @@ class AccountService(
             try {
                 return transactionTemplate.execute {
                     val accountNumber = accountNumberGenerator.generate()
-                    val accountEntity = Account.create(
+                    val accountEntity = AccountEntity.create(
                         accountNumber = accountNumber,
                         holderName = request.holderName,
                         balance = request.initialBalance,

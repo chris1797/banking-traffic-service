@@ -1,17 +1,19 @@
-package com.banking.core.service
+package com.banking.core.service.account.unit
 
-import com.banking.core.domain.Account
+import com.banking.core.domain.AccountEntity
+import com.banking.core.domain.EntityStatus
 import com.banking.core.dto.request.account.AccountCreateRequest
 import com.banking.core.dto.request.account.AccountDepositRequest
 import com.banking.core.dto.response.account.AccountResponse
 import com.banking.core.repository.AccountRepository
-import com.banking.core.service.account.AccountService
 import com.banking.core.service.account.AccountNumberGenerator
+import com.banking.core.service.account.AccountService
 import com.banking.core.support.response.error.CoreException
 import com.banking.core.support.response.error.ErrorType
-import io.mockk.*
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -20,6 +22,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.transaction.support.TransactionCallback
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 class AccountServiceTest {
 
@@ -70,9 +73,9 @@ class AccountServiceTest {
         2. 계좌번호 생성기와 저장소가 각각 한 번씩 호출되었는지 검증
         3. 트랜잭션 템플릿이 한 번 호출되었는지 검증
          */
-        assertThat(result.accountNumber).isEqualTo(expectedAccountNumber)
-        assertThat(result.holderName).isEqualTo("이재훈")
-        assertThat(result.balance).isEqualByComparingTo(BigDecimal(1000))
+        Assertions.assertThat(result.accountNumber).isEqualTo(expectedAccountNumber)
+        Assertions.assertThat(result.holderName).isEqualTo("이재훈")
+        Assertions.assertThat(result.balance).isEqualByComparingTo(BigDecimal(1000))
 
         verify(exactly = 1) { accountNumberGenerator.generate() }
         verify(exactly = 1) { accountRepository.save(any()) }
@@ -109,8 +112,8 @@ class AccountServiceTest {
         val result = accountService.createAccount(request)
 
         // then
-        assertThat(result.accountNumber).isEqualTo("unique12345678")
-        assertThat(result.holderName).isEqualTo("이재훈")
+        Assertions.assertThat(result.accountNumber).isEqualTo("unique12345678")
+        Assertions.assertThat(result.holderName).isEqualTo("이재훈")
 
         verify(exactly = 2) { accountNumberGenerator.generate() }
         verify(exactly = 2) { accountRepository.save(any()) }
@@ -125,13 +128,13 @@ class AccountServiceTest {
         )
 
         every { accountNumberGenerator.generate() } returns "duplicate00001"
-        every { transactionTemplate.execute(any<TransactionCallback<Account>>()) } answers {
-            firstArg<TransactionCallback<Account>>().doInTransaction(mockk())
+        every { transactionTemplate.execute(any<TransactionCallback<AccountEntity>>()) } answers {
+            firstArg<TransactionCallback<AccountEntity>>().doInTransaction(mockk())
         }
         every { accountRepository.save(any()) } throws DataIntegrityViolationException("Duplicate entry")
 
         // when & then
-        assertThatThrownBy { accountService.createAccount(request) }
+        Assertions.assertThatThrownBy { accountService.createAccount(request) }
             .isInstanceOf(CoreException::class.java)
             .hasCauseInstanceOf(DataIntegrityViolationException::class.java)
 
@@ -150,28 +153,28 @@ class AccountServiceTest {
                 accountNumber = accountNumber,
                 amount = BigDecimal(5000)
             )
-            val account = mockk<Account>(relaxed = true)
+            val accountEntity = mockk<AccountEntity>(relaxed = true)
 
-            every { account.accountNumber } returns accountNumber
-            every { account.holderName } returns "이재훈"
-            every { account.balance } returns BigDecimal(6000)
-            every { account.isActive() } returns true
-            every { account.id } returns 1L
-            every { account.status } returns com.banking.core.domain.EntityStatus.ACTIVE
-            every { account.createdAt } returns java.time.LocalDateTime.now()
-            every { account.updatedAt } returns java.time.LocalDateTime.now()
+            every { accountEntity.accountNumber } returns accountNumber
+            every { accountEntity.holderName } returns "이재훈"
+            every { accountEntity.balance } returns BigDecimal(6000)
+            every { accountEntity.isActive() } returns true
+            every { accountEntity.id } returns 1L
+            every { accountEntity.status } returns EntityStatus.ACTIVE
+            every { accountEntity.createdAt } returns LocalDateTime.now()
+            every { accountEntity.updatedAt } returns LocalDateTime.now()
 
             every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
                 firstArg<TransactionCallback<*>>().doInTransaction(mockk())
             }
-            every { accountRepository.findByAccountNumber(accountNumber) } returns account
+            every { accountRepository.findByAccountNumber(accountNumber) } returns accountEntity
 
             // when
             val result = accountService.deposit(request)
 
             // then
-            assertThat(result.accountNumber).isEqualTo(accountNumber)
-            verify(exactly = 1) { account.deposit(BigDecimal(5000)) }
+            Assertions.assertThat(result.accountNumber).isEqualTo(accountNumber)
+            verify(exactly = 1) { accountEntity.deposit(BigDecimal(5000)) }
         }
 
         @Test
@@ -188,10 +191,10 @@ class AccountServiceTest {
             every { accountRepository.findByAccountNumber("non-existent") } returns null
 
             // when & then
-            assertThatThrownBy { accountService.deposit(request) }
+            Assertions.assertThatThrownBy { accountService.deposit(request) }
                 .isInstanceOf(CoreException::class.java)
                 .satisfies({ ex ->
-                    assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.ACCOUNT_NOT_FOUND)
+                    Assertions.assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.ACCOUNT_NOT_FOUND)
                 })
         }
 
@@ -203,19 +206,19 @@ class AccountServiceTest {
                 accountNumber = accountNumber,
                 amount = BigDecimal(5000)
             )
-            val account = mockk<Account>(relaxed = true)
+            val accountEntity = mockk<AccountEntity>(relaxed = true)
 
-            every { account.isDeleted() } returns true
+            every { accountEntity.isDeleted() } returns true
             every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
                 firstArg<TransactionCallback<*>>().doInTransaction(mockk())
             }
-            every { accountRepository.findByAccountNumber(accountNumber) } returns account
+            every { accountRepository.findByAccountNumber(accountNumber) } returns accountEntity
 
             // when & then
-            assertThatThrownBy { accountService.deposit(request) }
+            Assertions.assertThatThrownBy { accountService.deposit(request) }
                 .isInstanceOf(CoreException::class.java)
                 .satisfies({ ex ->
-                    assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.ACCOUNT_DELETED)
+                    Assertions.assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.ACCOUNT_DELETED)
                 })
         }
 
@@ -227,32 +230,32 @@ class AccountServiceTest {
                 accountNumber = accountNumber,
                 amount = BigDecimal(5000)
             )
-            val account = mockk<Account>(relaxed = true)
+            val accountEntity = mockk<AccountEntity>(relaxed = true)
 
-            every { account.accountNumber } returns accountNumber
-            every { account.holderName } returns "이재훈"
-            every { account.balance } returns BigDecimal(6000)
-            every { account.isActive() } returns true
-            every { account.id } returns 1L
-            every { account.status } returns com.banking.core.domain.EntityStatus.ACTIVE
-            every { account.createdAt } returns java.time.LocalDateTime.now()
-            every { account.updatedAt } returns java.time.LocalDateTime.now()
+            every { accountEntity.accountNumber } returns accountNumber
+            every { accountEntity.holderName } returns "이재훈"
+            every { accountEntity.balance } returns BigDecimal(6000)
+            every { accountEntity.isActive() } returns true
+            every { accountEntity.id } returns 1L
+            every { accountEntity.status } returns EntityStatus.ACTIVE
+            every { accountEntity.createdAt } returns LocalDateTime.now()
+            every { accountEntity.updatedAt } returns LocalDateTime.now()
 
             var callCount = 0
             every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
                 callCount++
                 if (callCount == 1) {
-                    throw ObjectOptimisticLockingFailureException(Account::class.java, "Optimistic lock conflict")
+                    throw ObjectOptimisticLockingFailureException(AccountEntity::class.java, "Optimistic lock conflict")
                 }
                 firstArg<TransactionCallback<*>>().doInTransaction(mockk())
             }
-            every { accountRepository.findByAccountNumber(accountNumber) } returns account
+            every { accountRepository.findByAccountNumber(accountNumber) } returns accountEntity
 
             // when
             val result = accountService.deposit(request)
 
             // then
-            assertThat(result.accountNumber).isEqualTo(accountNumber)
+            Assertions.assertThat(result.accountNumber).isEqualTo(accountNumber)
             verify(exactly = 2) { transactionTemplate.execute(any<TransactionCallback<*>>()) }
         }
 
@@ -265,13 +268,13 @@ class AccountServiceTest {
             )
 
             every { transactionTemplate.execute(any<TransactionCallback<*>>()) } throws
-                ObjectOptimisticLockingFailureException(Account::class.java, "Optimistic lock conflict")
+                    ObjectOptimisticLockingFailureException(AccountEntity::class.java, "Optimistic lock conflict")
 
             // when & then
-            assertThatThrownBy { accountService.deposit(request) }
+            Assertions.assertThatThrownBy { accountService.deposit(request) }
                 .isInstanceOf(CoreException::class.java)
                 .satisfies({ ex ->
-                    assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.DEPOSIT_FAILED)
+                    Assertions.assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.DEPOSIT_FAILED)
                 })
                 .hasCauseInstanceOf(ObjectOptimisticLockingFailureException::class.java)
 

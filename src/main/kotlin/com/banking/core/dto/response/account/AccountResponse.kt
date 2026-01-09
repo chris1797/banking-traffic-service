@@ -1,6 +1,6 @@
 package com.banking.core.dto.response.account
 
-import com.banking.core.domain.Account
+import com.banking.core.domain.AccountEntity
 import com.banking.core.domain.EntityStatus
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -15,15 +15,15 @@ data class AccountResponse(
     val balance: BigDecimal
 ) {
     companion object {
-        fun from(account: Account): AccountResponse {
+        fun from(accountEntity: AccountEntity): AccountResponse {
             return AccountResponse(
-                id = account.id,
-                status = account.status,
-                createdAt = account.createdAt,
-                updatedAt = account.updatedAt,
-                accountNumber = account.accountNumber,
-                holderName = account.holderName,
-                balance = account.balance
+                id = accountEntity.id,
+                status = accountEntity.status,
+                createdAt = accountEntity.createdAt,
+                updatedAt = accountEntity.updatedAt,
+                accountNumber = accountEntity.accountNumber,
+                holderName = accountEntity.holderName,
+                balance = accountEntity.balance
             )
         }
     }

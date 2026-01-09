@@ -1,0 +1,209 @@
+# 작업 로그 - 2026-01-08
+
+## 작업 요약
+
+출금(withdraw) 기능 구현 및 Testcontainers 기반 동시성 테스트 작성
+
+---
+
+## 1. 출금 엔드포인트 작성
+
+### 생성된 파일
+
+**AccountWithdrawRequest.kt**
+```kotlin
+data class AccountWithdrawRequest(
+    val accountNumber: String,
+    val amount: BigDecimal
+)
+```
+
+**AccountController.kt (추가)**
+```kotlin
+@PatchMapping("/v1/account/withdraw")
+fun withdraw(
+    @RequestBody request: AccountWithdrawRequest
+): ApiResponse<AccountResponse> {
+    return ApiResponse.success(accountService.withdraw(request))
+}
+```
+
+---
+
+## 2. 출금 도메인 메서드 구현
+
+### Account.kt
+```kotlin
+internal fun withdraw(amount: BigDecimal) {
+    require(amount > BigDecimal.ZERO) { "출금 금액은 0보다 커야 합니다." }
+    require(this.balance >= amount) { "잔액이 부족합니다." }
+    this.balance -= amount
+}
+```
+
+- `internal`: 같은 모듈 내에서만 접근 가능
+- `require`: 금액 및 잔액 검증
+
+---
+
+## 3. 출금 관련 에러 타입 추가
+
+### ErrorCode.kt
+```kotlin
+ERROR_1006, // Insufficient Balance
+ERROR_1007, // Withdraw Failed (Optimistic Lock Conflict)
+```
+
+### ErrorType.kt
+```kotlin
+INSUFFICIENT_BALANCE(HttpStatus.BAD_REQUEST, ErrorCode.ERROR_1006, "잔액이 부족합니다.", LogLevel.WARN),
+WITHDRAW_FAILED(HttpStatus.CONFLICT, ErrorCode.ERROR_1007, "출금 처리 중 충돌이 발생했습니다. 잠시 후 다시 시도해주세요.", LogLevel.WARN),
+```
+
+---
+
+## 4. 출금 서비스 로직 구현
+
+### AccountService.kt
+```kotlin
+fun withdraw(request: AccountWithdrawRequest): AccountResponse {
+    var lastException: Exception? = null
+
+    repeat(MAX_RETRY_COUNT) { attempt ->
+        try {
+            return transactionTemplate.execute {
+                val accountEntity = accountRepository.findByAccountNumber(request.accountNumber)
+                    ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
+
+                if (accountEntity.isDeleted()) {
+                    throw CoreException(ErrorType.ACCOUNT_DELETED)
+                }
+
+                if (accountEntity.balance < request.amount) {
+                    throw CoreException(ErrorType.INSUFFICIENT_BALANCE)
+                }
+
+                accountEntity.withdraw(request.amount)
+                AccountResponse.from(accountEntity)
+            } ?: throw CoreException(ErrorType.WITHDRAW_FAILED)
+        } catch (e: ObjectOptimisticLockingFailureException) {
+            lastException = e
+            log.warn("출금 충돌 발생, 재시도 중 (계좌: ${request.accountNumber}, 시도: ${attempt + 1}/$MAX_RETRY_COUNT)")
+        }
+    }
+    throw CoreException(ErrorType.WITHDRAW_FAILED).initCause(lastException)
+}
+```
+
+---
+
+## 5. Testcontainers 설정
+
+### 문제점
+Docker Desktop 4.8.1의 API 버전(1.41)과 Testcontainers가 사용하는 API 버전(1.44) 불일치
+
+```
+client version 1.44 is too new. Maximum supported API version is 1.41
+```
+
+### 해결
+Spring Boot의 Testcontainers 지원 사용
+
+**build.gradle.kts**
+```kotlin
+// Spring Boot가 버전 관리
+testImplementation("org.springframework.boot:spring-boot-testcontainers")
+testImplementation("org.testcontainers:junit-jupiter")
+testImplementation("org.testcontainers:postgresql")
+```
+
+**IntegrationTestSupport.kt**
+```kotlin
+@SpringBootTest
+@Testcontainers
+abstract class IntegrationTestSupport {
+
+    companion object {
+        @Container
+        @ServiceConnection  // Spring Boot 3.1+에서 자동 DataSource 설정
+        @JvmStatic
+        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:15-alpine")
+            .withDatabaseName("test")
+            .withUsername("test")
+            .withPassword("test")
+
+        @DynamicPropertySource
+        @JvmStatic
+        fun configureProperties(registry: DynamicPropertyRegistry) {
+            registry.add("spring.jpa.hibernate.ddl-auto") { "create-drop" }
+        }
+    }
+}
+```
+
+---
+
+## 6. 동시성 테스트 작성
+
+### AccountServiceConcurrencyTest.kt
+
+**테스트 1: 동시에 10개 스레드에서 출금**
+- 10,000원 계좌에서 1,000원씩 10번 동시 출금
+- 기대 결과: 모두 성공, 최종 잔액 0원
+
+**테스트 2: 잔액 부족 시 일부 출금만 성공**
+- 5,000원 계좌에서 1,000원씩 10번 동시 출금
+- 기대 결과: 5번 성공, 5번 잔액 부족 에러
+
+---
+
+## 7. 재시도 횟수 조정
+
+### 문제점
+MAX_RETRY_COUNT = 3으로는 10개 동시 요청 처리 시 재시도 초과 실패 발생
+
+```
+성공: 5, 실패: 5
+최종 잔액: 5000.00
+```
+
+### 해결
+MAX_RETRY_COUNT를 10으로 증가
+
+```kotlin
+companion object {
+    private const val MAX_RETRY_COUNT = 10  // 3 → 10
+}
+```
+
+### 결과
+```
+성공: 10, 실패: 0
+최종 잔액: 0.00
+```
+
+---
+
+## 변경된 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `AccountWithdrawRequest.kt` | 신규 생성 |
+| `AccountController.kt` | withdraw 엔드포인트 추가 |
+| `Account.kt` | withdraw 메서드 추가 (internal + require) |
+| `ErrorCode.kt` | ERROR_1006, ERROR_1007 추가 |
+| `ErrorType.kt` | INSUFFICIENT_BALANCE, WITHDRAW_FAILED 추가 |
+| `AccountService.kt` | withdraw 메서드 구현, MAX_RETRY_COUNT 10으로 변경 |
+| `build.gradle.kts` | Testcontainers 의존성 추가 |
+| `IntegrationTestSupport.kt` | 신규 생성 (통합 테스트 기본 클래스) |
+| `AccountServiceConcurrencyTest.kt` | 신규 생성 (동시성 테스트) |
+| `testcontainers.properties` | 신규 생성 |
+
+---
+
+## 교훈
+
+1. Testcontainers는 Spring Boot BOM을 통해 버전 관리하는 것이 호환성 문제를 줄임
+2. `@ServiceConnection`을 사용하면 DataSource 설정을 자동화할 수 있음
+3. 낙관적 락 사용 시 동시 요청 수에 따라 재시도 횟수를 적절히 설정해야 함
+4. 동시성 테스트는 실제 DB(Testcontainers)로 해야 정확한 결과를 얻을 수 있음

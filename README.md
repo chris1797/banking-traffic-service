@@ -83,6 +83,7 @@
 | Account | [계좌 생성 동시성 이슈](docs/account/create-account/CONCURRENCY.md) | 계좌 생성 관련 동시성 문제 |
 | Account | [계좌 생성 리팩토링](docs/account/create-account/REFACTORING.md) | 계좌 생성 기능 문제점 및 해결 과정 |
 | Account | [입금 동시성 이슈](docs/account/deposit/CONCURRENCY.md) | 입금 관련 동시성 문제 (Lost Update, Double Submit) |
+| Account | [출금 동시성 이슈](docs/account/withdraw/CONCURRENCY.md) | 출금 관련 동시성 문제 (Lost Update, Race Condition) |
 
 ## 부하 테스트
 
