@@ -280,5 +280,30 @@ class AccountServiceTest {
 
             verify(exactly = 3) { transactionTemplate.execute(any<TransactionCallback<*>>()) }
         }
+
+
+        @Nested
+        inner class WithdrawTest {
+
+            @Test
+            fun `정상 출금 시 잔액 차감`() {
+                // given
+                val initialAmount = BigDecimal(5000)
+                val withdrawalAmount = BigDecimal(2000)
+
+                val accountEntity = AccountEntity.create(
+                    accountNumber = "1234-5678-9012",
+                    holderName = "테스트",
+                    balance = initialAmount
+                )
+
+                // when
+                accountEntity.withdraw(withdrawalAmount)
+
+                // then
+                Assertions.assertThat(accountEntity.balance).isEqualByComparingTo(initialAmount - withdrawalAmount)
+            }
+        }
+
     }
 }
