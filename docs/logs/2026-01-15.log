@@ -1,0 +1,115 @@
+# 작업 로그 - 2026-01-15
+
+## 작업 요약
+
+AccountService 출금(withdraw) 메서드에 대한 단위 테스트 작성 완료
+
+---
+
+## 1. 출금 서비스 단위 테스트 추가
+
+### 기존 코드
+
+WithdrawTest가 DepositTest 안에 잘못 중첩되어 있었고, 도메인 레벨 테스트만 존재했음
+
+```kotlin
+@Nested
+inner class DepositTest {
+    // 입금 테스트들...
+
+    @Nested
+    inner class WithdrawTest {
+        @Test
+        fun `정상 출금 시 잔액 차감`() {
+            // 도메인 레벨 테스트만 존재
+            val accountEntity = AccountEntity.create(...)
+            accountEntity.withdraw(withdrawalAmount)
+            // ...
+        }
+    }
+}
+```
+
+### 문제점
+- WithdrawTest가 DepositTest 내부에 잘못 중첩됨
+- 서비스 레벨 테스트 없이 도메인 테스트만 존재
+- AccountService.withdraw() 메서드의 다양한 케이스 미검증
+
+### 해결
+- WithdrawTest를 DepositTest와 동일 레벨로 이동
+- 서비스 레벨 테스트 케이스 6개 추가:
+  1. 출금 성공 테스트
+  2. 존재하지 않는 계좌에 출금 시 예외 발생
+  3. 삭제된 계좌에 출금 시 예외 발생
+  4. 잔액 부족 시 예외 발생
+  5. 낙관적 락 충돌 발생 시 재시도하여 성공
+  6. 낙관적 락 충돌 최대 재시도 횟수 초과 시 예외 발생
+
+---
+
+## 변경된 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/test/kotlin/com/banking/core/service/account/unit/AccountServiceTest.kt` | 출금 서비스 테스트 6개 추가 |
+| `docs/TODO.md` | 출금 테스트 체크박스 완료 처리 |
+
+---
+
+## 최종 코드
+
+```kotlin
+@Nested
+inner class WithdrawTest {
+
+    @Test
+    fun `출금 성공 테스트`() {
+        // given
+        val accountNumber = "1234-5678-9012"
+        val request = AccountWithdrawRequest(
+            accountNumber = accountNumber,
+            amount = BigDecimal(3000)
+        )
+        val accountEntity = mockk<AccountEntity>(relaxed = true)
+
+        every { accountEntity.accountNumber } returns accountNumber
+        every { accountEntity.holderName } returns "이재훈"
+        every { accountEntity.balance } returns BigDecimal(7000)
+        every { accountEntity.isDeleted() } returns false
+        // ...
+
+        // when
+        val result = accountService.withdraw(request)
+
+        // then
+        Assertions.assertThat(result.accountNumber).isEqualTo(accountNumber)
+        verify(exactly = 1) { accountEntity.withdraw(BigDecimal(3000)) }
+    }
+
+    @Test
+    fun `존재하지 않는 계좌에 출금 시 예외 발생`() { /* ... */ }
+
+    @Test
+    fun `삭제된 계좌에 출금 시 예외 발생`() { /* ... */ }
+
+    @Test
+    fun `잔액 부족 시 예외 발생`() { /* ... */ }
+
+    @Test
+    fun `낙관적 락 충돌 발생 시 재시도하여 성공`() { /* ... */ }
+
+    @Test
+    fun `낙관적 락 충돌 최대 재시도 횟수 초과 시 예외 발생`() {
+        // ...
+        verify(exactly = 10) { transactionTemplate.execute(any<TransactionCallback<*>>()) }
+    }
+}
+```
+
+---
+
+## 교훈
+
+1. 테스트 클래스의 중첩 구조는 기능 단위로 명확하게 분리해야 함
+2. 서비스 레벨 테스트와 도메인 레벨 테스트는 목적이 다르므로 분리 필요
+3. MAX_RETRY_COUNT 값이 변경되면 관련 테스트의 verify 횟수도 함께 수정 필요

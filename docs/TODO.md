@@ -21,10 +21,10 @@
   - [x] 출금 (withdraw) - 낙관적 락 + 재시도 로직 적용
 - [x] AccountController
 - [x] AccountNumberGenerator (인터페이스 분리)
-- [ ] 단위 테스트
+- [x] 단위 테스트
   - [x] AccountServiceTest (계좌 생성)
   - [x] AccountServiceTest (입금)
-  - [ ] AccountServiceTest (출금)
+  - [x] AccountServiceTest (출금)
 
 ## 3. 이체 (Transfer)
 

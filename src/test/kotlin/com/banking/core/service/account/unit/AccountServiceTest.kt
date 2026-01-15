@@ -4,6 +4,7 @@ import com.banking.core.domain.AccountEntity
 import com.banking.core.domain.EntityStatus
 import com.banking.core.dto.request.account.AccountCreateRequest
 import com.banking.core.dto.request.account.AccountDepositRequest
+import com.banking.core.dto.request.account.AccountWithdrawRequest
 import com.banking.core.dto.response.account.AccountResponse
 import com.banking.core.repository.AccountRepository
 import com.banking.core.service.account.AccountNumberGenerator
@@ -280,30 +281,172 @@ class AccountServiceTest {
 
             verify(exactly = 3) { transactionTemplate.execute(any<TransactionCallback<*>>()) }
         }
+    }
 
+    @Nested
+    inner class WithdrawTest {
 
-        @Nested
-        inner class WithdrawTest {
+        @Test
+        fun `출금 성공 테스트`() {
+            // given
+            val accountNumber = "1234-5678-9012"
+            val request = AccountWithdrawRequest(
+                accountNumber = accountNumber,
+                amount = BigDecimal(3000)
+            )
+            val accountEntity = mockk<AccountEntity>(relaxed = true)
 
-            @Test
-            fun `정상 출금 시 잔액 차감`() {
-                // given
-                val initialAmount = BigDecimal(5000)
-                val withdrawalAmount = BigDecimal(2000)
+            every { accountEntity.accountNumber } returns accountNumber
+            every { accountEntity.holderName } returns "이재훈"
+            every { accountEntity.balance } returns BigDecimal(7000)
+            every { accountEntity.isActive() } returns true
+            every { accountEntity.isDeleted() } returns false
+            every { accountEntity.id } returns 1L
+            every { accountEntity.status } returns EntityStatus.ACTIVE
+            every { accountEntity.createdAt } returns LocalDateTime.now()
+            every { accountEntity.updatedAt } returns LocalDateTime.now()
 
-                val accountEntity = AccountEntity.create(
-                    accountNumber = "1234-5678-9012",
-                    holderName = "테스트",
-                    balance = initialAmount
-                )
-
-                // when
-                accountEntity.withdraw(withdrawalAmount)
-
-                // then
-                Assertions.assertThat(accountEntity.balance).isEqualByComparingTo(initialAmount - withdrawalAmount)
+            every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
+                firstArg<TransactionCallback<*>>().doInTransaction(mockk())
             }
+            every { accountRepository.findByAccountNumber(accountNumber) } returns accountEntity
+
+            // when
+            val result = accountService.withdraw(request)
+
+            // then
+            Assertions.assertThat(result.accountNumber).isEqualTo(accountNumber)
+            verify(exactly = 1) { accountEntity.withdraw(BigDecimal(3000)) }
         }
 
+        @Test
+        fun `존재하지 않는 계좌에 출금 시 예외 발생`() {
+            // given
+            val request = AccountWithdrawRequest(
+                accountNumber = "non-existent",
+                amount = BigDecimal(3000)
+            )
+
+            every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
+                firstArg<TransactionCallback<*>>().doInTransaction(mockk())
+            }
+            every { accountRepository.findByAccountNumber("non-existent") } returns null
+
+            // when & then
+            Assertions.assertThatThrownBy { accountService.withdraw(request) }
+                .isInstanceOf(CoreException::class.java)
+                .satisfies({ ex ->
+                    Assertions.assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.ACCOUNT_NOT_FOUND)
+                })
+        }
+
+        @Test
+        fun `삭제된 계좌에 출금 시 예외 발생`() {
+            // given
+            val accountNumber = "deleted-account"
+            val request = AccountWithdrawRequest(
+                accountNumber = accountNumber,
+                amount = BigDecimal(3000)
+            )
+            val accountEntity = mockk<AccountEntity>(relaxed = true)
+
+            every { accountEntity.isDeleted() } returns true
+            every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
+                firstArg<TransactionCallback<*>>().doInTransaction(mockk())
+            }
+            every { accountRepository.findByAccountNumber(accountNumber) } returns accountEntity
+
+            // when & then
+            Assertions.assertThatThrownBy { accountService.withdraw(request) }
+                .isInstanceOf(CoreException::class.java)
+                .satisfies({ ex ->
+                    Assertions.assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.ACCOUNT_DELETED)
+                })
+        }
+
+        @Test
+        fun `잔액 부족 시 예외 발생`() {
+            // given
+            val accountNumber = "1234-5678-9012"
+            val request = AccountWithdrawRequest(
+                accountNumber = accountNumber,
+                amount = BigDecimal(10000)
+            )
+            val accountEntity = mockk<AccountEntity>(relaxed = true)
+
+            every { accountEntity.balance } returns BigDecimal(5000)
+            every { accountEntity.isDeleted() } returns false
+            every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
+                firstArg<TransactionCallback<*>>().doInTransaction(mockk())
+            }
+            every { accountRepository.findByAccountNumber(accountNumber) } returns accountEntity
+
+            // when & then
+            Assertions.assertThatThrownBy { accountService.withdraw(request) }
+                .isInstanceOf(CoreException::class.java)
+                .satisfies({ ex ->
+                    Assertions.assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.INSUFFICIENT_BALANCE)
+                })
+        }
+
+        @Test
+        fun `낙관적 락 충돌 발생 시 재시도하여 성공`() {
+            // given
+            val accountNumber = "1234-5678-9012"
+            val request = AccountWithdrawRequest(
+                accountNumber = accountNumber,
+                amount = BigDecimal(3000)
+            )
+            val accountEntity = mockk<AccountEntity>(relaxed = true)
+
+            every { accountEntity.accountNumber } returns accountNumber
+            every { accountEntity.holderName } returns "이재훈"
+            every { accountEntity.balance } returns BigDecimal(10000)
+            every { accountEntity.isActive() } returns true
+            every { accountEntity.isDeleted() } returns false
+            every { accountEntity.id } returns 1L
+            every { accountEntity.status } returns EntityStatus.ACTIVE
+            every { accountEntity.createdAt } returns LocalDateTime.now()
+            every { accountEntity.updatedAt } returns LocalDateTime.now()
+
+            var callCount = 0
+            every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
+                callCount++
+                if (callCount == 1) {
+                    throw ObjectOptimisticLockingFailureException(AccountEntity::class.java, "Optimistic lock conflict")
+                }
+                firstArg<TransactionCallback<*>>().doInTransaction(mockk())
+            }
+            every { accountRepository.findByAccountNumber(accountNumber) } returns accountEntity
+
+            // when
+            val result = accountService.withdraw(request)
+
+            // then
+            Assertions.assertThat(result.accountNumber).isEqualTo(accountNumber)
+            verify(exactly = 2) { transactionTemplate.execute(any<TransactionCallback<*>>()) }
+        }
+
+        @Test
+        fun `낙관적 락 충돌 최대 재시도 횟수 초과 시 예외 발생`() {
+            // given
+            val request = AccountWithdrawRequest(
+                accountNumber = "1234-5678-9012",
+                amount = BigDecimal(3000)
+            )
+
+            every { transactionTemplate.execute(any<TransactionCallback<*>>()) } throws
+                    ObjectOptimisticLockingFailureException(AccountEntity::class.java, "Optimistic lock conflict")
+
+            // when & then
+            Assertions.assertThatThrownBy { accountService.withdraw(request) }
+                .isInstanceOf(CoreException::class.java)
+                .satisfies({ ex ->
+                    Assertions.assertThat((ex as CoreException).errorType).isEqualTo(ErrorType.WITHDRAW_FAILED)
+                })
+                .hasCauseInstanceOf(ObjectOptimisticLockingFailureException::class.java)
+
+            verify(exactly = 10) { transactionTemplate.execute(any<TransactionCallback<*>>()) }
+        }
     }
 }
