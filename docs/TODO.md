@@ -14,15 +14,17 @@
 
 - [x] Account 엔티티
 - [x] AccountRepository
-- [ ] AccountService (생성, 조회, 입금, 출금)
+- [x] AccountService (생성, 조회, 입금, 출금)
   - [x] 계좌 생성 (createAccount)
-  - [ ] 계좌 조회
-  - [ ] 입금
-  - [ ] 출금
+  - [x] 계좌 조회 (getAccount)
+  - [x] 입금 (deposit) - 낙관적 락 + 재시도 로직 적용
+  - [x] 출금 (withdraw) - 낙관적 락 + 재시도 로직 적용
 - [x] AccountController
 - [x] AccountNumberGenerator (인터페이스 분리)
 - [ ] 단위 테스트
   - [x] AccountServiceTest (계좌 생성)
+  - [x] AccountServiceTest (입금)
+  - [ ] AccountServiceTest (출금)
 
 ## 3. 이체 (Transfer)
 
@@ -59,7 +61,7 @@
 ## 7. 동시성 제어
 
 - [ ] Pessimistic Lock 적용 (출금, 이체)
-- [ ] Optimistic Lock 적용 (@Version)
+- [x] Optimistic Lock 적용 (@Version) - 입금, 출금에 적용 완료
 - [ ] Redis 분산 락 구현
 - [ ] Idempotency Key 처리
 
