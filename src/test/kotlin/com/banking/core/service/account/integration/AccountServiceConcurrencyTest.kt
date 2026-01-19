@@ -1,8 +1,8 @@
 package com.banking.core.service.account.integration
 
 import com.banking.core.IntegrationTestSupport
-import com.banking.core.dto.request.account.AccountCreateRequest
-import com.banking.core.dto.request.account.AccountWithdrawRequest
+import com.banking.core.dto.account.request.AccountCreateRequest
+import com.banking.core.dto.account.request.AccountWithdrawRequest
 import com.banking.core.repository.AccountRepository
 import com.banking.core.service.account.AccountService
 import com.banking.core.support.response.error.CoreException

@@ -1,4 +1,4 @@
-package com.banking.core.dto.response.account
+package com.banking.core.dto.account.reponse
 
 import com.banking.core.domain.AccountEntity
 import com.banking.core.domain.EntityStatus

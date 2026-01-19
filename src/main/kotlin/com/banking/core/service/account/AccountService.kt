@@ -1,10 +1,10 @@
 package com.banking.core.service.account
 
 import com.banking.core.domain.AccountEntity
-import com.banking.core.dto.request.account.AccountCreateRequest
-import com.banking.core.dto.request.account.AccountDepositRequest
-import com.banking.core.dto.request.account.AccountWithdrawRequest
-import com.banking.core.dto.response.account.AccountResponse
+import com.banking.core.dto.account.request.AccountCreateRequest
+import com.banking.core.dto.account.request.AccountDepositRequest
+import com.banking.core.dto.account.request.AccountWithdrawRequest
+import com.banking.core.dto.account.reponse.AccountResponse
 import com.banking.core.repository.AccountRepository
 import com.banking.core.support.response.error.CoreException
 import com.banking.core.support.response.error.ErrorType
