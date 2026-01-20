@@ -28,11 +28,17 @@
 
 ## 3. 이체 (Transfer)
 
-- [ ] Transfer 엔티티 (이체 내역)
-- [ ] TransferRepository
-- [ ] TransferService (이체 로직)
-- [ ] TransferController
-- [ ] 단위 테스트
+- [x] Transfer 엔티티 (이체 내역)
+- [x] TransferRepository
+- [x] TransferService (이체 로직) - 낙관적 락 + 재시도 로직 적용
+- [x] TransferController
+- [x] 단위 테스트
+  - [x] TransferServiceTest (이체)
+  - [x] TransferServiceTest (이체 내역 조회)
+- [x] 동시성 테스트
+  - [x] 동시 이체 정합성 테스트
+  - [x] 잔액 부족 시 일부 성공 테스트
+  - [x] 교차 이체 Deadlock 방지 테스트
 
 ## 4. 결제 (Payment)
 

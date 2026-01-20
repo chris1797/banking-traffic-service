@@ -20,4 +20,10 @@ enum class ErrorType(
     DEPOSIT_FAILED(HttpStatus.CONFLICT, ErrorCode.ERROR_1005, "입금 처리 중 충돌이 발생했습니다. 잠시 후 다시 시도해주세요.", LogLevel.WARN),
     INSUFFICIENT_BALANCE(HttpStatus.BAD_REQUEST, ErrorCode.ERROR_1006, "잔액이 부족합니다.", LogLevel.WARN),
     WITHDRAW_FAILED(HttpStatus.CONFLICT, ErrorCode.ERROR_1007, "출금 처리 중 충돌이 발생했습니다. 잠시 후 다시 시도해주세요.", LogLevel.WARN),
+
+    // Transfer Errors
+    TRANSFER_FAILED(HttpStatus.CONFLICT, ErrorCode.ERROR_2001, "이체 처리 중 충돌이 발생했습니다. 잠시 후 다시 시도해주세요.", LogLevel.WARN),
+    TRANSFER_NOT_FOUND(HttpStatus.NOT_FOUND, ErrorCode.ERROR_2002, "요청하신 이체 내역을 찾을 수 없습니다.", LogLevel.WARN),
+    SAME_ACCOUNT_TRANSFER(HttpStatus.BAD_REQUEST, ErrorCode.ERROR_2003, "출금 계좌와 입금 계좌가 동일합니다.", LogLevel.WARN),
+    INVALID_TRANSFER_AMOUNT(HttpStatus.BAD_REQUEST, ErrorCode.ERROR_2004, "이체 금액이 올바르지 않습니다.", LogLevel.WARN),
 }

@@ -14,4 +14,10 @@ enum class ErrorCode {
     ERROR_1005, // Deposit Failed (Optimistic Lock Conflict)
     ERROR_1006, // Insufficient Balance
     ERROR_1007, // Withdraw Failed (Optimistic Lock Conflict)
+
+    // Transfer Errors (2000번대)
+    ERROR_2001, // Transfer Failed (Optimistic Lock Conflict)
+    ERROR_2002, // Transfer Not Found
+    ERROR_2003, // Same Account Transfer
+    ERROR_2004, // Invalid Transfer Amount
 }
