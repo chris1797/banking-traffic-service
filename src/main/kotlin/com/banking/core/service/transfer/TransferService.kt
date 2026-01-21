@@ -10,6 +10,7 @@ import com.banking.core.support.response.error.ErrorType
 import org.slf4j.LoggerFactory
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 
@@ -30,6 +31,7 @@ class TransferService(
     fun transfer(request: TransferRequest): TransferResponse {
         validateTransferRequest(request)
 
+        // 실패하더라도 이체 이력은 남아야 하므로 별도 트랜잭션으로 분리
         val transferEntity = createPendingTransfer(request)
 
         return executeTransfer(transferEntity, request)
@@ -63,7 +65,9 @@ class TransferService(
 
         repeat(MAX_RETRY_COUNT) { attempt ->
             try {
+                // 매 시도마다 새 트랜잭션으로 (@Transactional 은 메소드 단위라 이처럼 내부에서 새 트랜잭션으로 재시도 불가)
                 return transactionTemplate.execute {
+
                     // Deadlock 방지: 계좌번호를 정렬하여 일관된 순서로 조회
                     val sortedAccountNumbers = listOf(request.fromAccountNumber, request.toAccountNumber).sorted()
                     val firstAccountNumber = sortedAccountNumbers[0]
@@ -126,6 +130,20 @@ class TransferService(
         } catch (e: Exception) {
             log.error("이체 실패 상태 업데이트 중 오류 발생 (transferId: $transferId)", e)
         }
+    }
+
+    @Transactional(readOnly = true)
+    fun getTransferInfo(transferId: Long): TransferResponse {
+        val transferEntity = transferRepository.findById(transferId)
+            .orElseThrow { CoreException(ErrorType.TRANSFER_NOT_FOUND) }
+
+        val fromAccount = accountRepository.findByAccountNumber(transferEntity.fromAccountNumber)
+            ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
+
+        val toAccount = accountRepository.findByAccountNumber(transferEntity.toAccountNumber)
+            ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
+
+        return TransferResponse.from(transferEntity, fromAccount, toAccount)
     }
 
 }
