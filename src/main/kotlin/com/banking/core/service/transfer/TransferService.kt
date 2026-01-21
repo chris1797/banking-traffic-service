@@ -138,10 +138,7 @@ class TransferService(
             .orElseThrow { CoreException(ErrorType.TRANSFER_NOT_FOUND) }
 
         val fromAccount = accountRepository.findByAccountNumber(transferEntity.fromAccountNumber)
-            ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
-
         val toAccount = accountRepository.findByAccountNumber(transferEntity.toAccountNumber)
-            ?: throw CoreException(ErrorType.ACCOUNT_NOT_FOUND)
 
         return TransferResponse.from(transferEntity, fromAccount, toAccount)
     }
